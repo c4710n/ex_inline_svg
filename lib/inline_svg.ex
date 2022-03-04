@@ -90,125 +90,81 @@ defmodule InlineSVG do
     default_collection: "fontawesome"
   ```
 
-  ### `:not_found`
-
-  Specify content to displayed in the `<i>` element when there is no SVG file found.
-
-  The default value is:
-
-  ```
-  <svg viewbox='0 0 60 60'>
-    <text x='0' y='40' font-size='30' font-weight='bold'
-      font-family='monospace'>Error</text>
-  </svg>
-  ```
-
-  ```elixir
-  config :inline_svg,
-    not_found: "<p>Oh No!</p>"
-  ```
   """
 
-  alias InlineSVG.Util
+  alias InlineSVG.HTML
 
   @doc """
-  The macro precompiles the SVG images into functions.
+  The macro precompiles the SVG files into functions.
   """
   defmacro __using__(_) do
     get_config(:dir, "assets/static/svg/")
-    |> find_collection_sets
-    |> Enum.uniq()
-    |> Enum.map(&create_cached_svg(&1))
+    |> scan_svgs()
+    |> Enum.map(&cache_svg/1)
   end
 
-  defp find_collection_sets(svgs_path) do
-    if File.dir?(svgs_path) do
-      case File.ls(svgs_path) do
-        {:ok, listed_files} ->
-          listed_files
-          |> Stream.filter(fn e -> File.dir?(Path.join(svgs_path, e)) end)
-          |> Enum.flat_map(&map_collection(&1, svgs_path))
+  def scan_svgs(root) do
+    root
+    |> Path.join("**/*.svg")
+    |> Path.wildcard()
+    |> Stream.filter(&File.regular?(&1))
+    |> Enum.map(fn svg_path ->
+      [collection_name, svg_name] =
+        svg_path
+        |> Path.relative_to(root)
+        |> Path.rootname()
+        |> String.split("/", parts: 2)
 
-        _ ->
-          []
-      end
-    else
-      []
-    end
+      {collection_name, svg_name, svg_path}
+    end)
   end
 
-  defp map_collection(collection, svgs_path) do
-    collection_path = Path.join(svgs_path, collection)
+  defp cache_svg({collection, name, path}) do
+    content = read_svg(path)
 
-    collection_path
-    |> File.ls!()
-    |> Stream.map(&Path.join(collection_path, &1))
-    |> Stream.flat_map(&to_file_path/1)
-    |> Enum.map(&{collection, &1})
-  end
+    # parse HTML at compile time.
+    parsed_html =
+      content
+      |> HTML.parse_html!()
+      |> Macro.escape()
 
-  defp to_file_path(path) do
-    if File.dir?(path) do
-      path
-      |> File.ls!()
-      |> Stream.map(&Path.join(path, &1))
-      |> Enum.flat_map(&to_file_path/1)
-    else
-      [path]
-    end
-  end
-
-  defp create_cached_svg({collection, name}) do
-    try do
-      filename = hd(Regex.run(~r|.*/#{collection}/(.*)\.svg$|, name, capture: :all_but_first))
-
-      content = read_svg_from_path(name)
-
-      generic_functions =
-        if get_config(:default_collection, "generic") == collection do
-          quote do
-            def svg(unquote(filename)) do
-              svg(unquote(filename), unquote(collection), [])
-            end
-
-            def svg(unquote(filename), opts) when is_list(opts) do
-              svg(unquote(filename), unquote(collection), opts)
-            end
-          end
-        end
-
-      explicit_functions =
+    generic_functions =
+      if collection == get_config(:default_collection, "generic") do
         quote do
-          def svg(unquote(filename), unquote(collection)) do
-            svg(unquote(filename), unquote(collection), [])
+          def svg(unquote(name)) do
+            svg(unquote(name), unquote(collection), [])
           end
 
-          def svg(unquote(filename), unquote(collection), opts) do
-            unquote(content)
-            |> Util.insert_attrs(opts)
-            |> Util.safety_string()
+          def svg(unquote(name), opts) when is_list(opts) do
+            svg(unquote(name), unquote(collection), opts)
           end
         end
+      end
 
-      [generic_functions, explicit_functions]
-    rescue
-      ArgumentError -> nil
-    end
+    explicit_functions =
+      quote do
+        def svg(unquote(name), unquote(collection)) do
+          svg(unquote(name), unquote(collection), [])
+        end
+
+        def svg(unquote(name), unquote(collection), []) do
+          unquote(content)
+        end
+
+        def svg(unquote(name), unquote(collection), opts) do
+          unquote(parsed_html)
+          |> HTML.insert_attrs(opts)
+          |> HTML.to_html()
+        end
+      end
+
+    [generic_functions, explicit_functions]
   end
 
-  defp read_svg_from_path(path) do
-    case File.read(path) do
-      {:ok, result} ->
-        String.trim(result)
-
-      {:error, _} ->
-        get_config(
-          :not_found,
-          "<svg viewbox='0 0 60 60'>" <>
-            "<text x='0' y='40' font-size='30' font-weight='bold'" <>
-            "font-family='monospace'>Error</text></svg>"
-        )
-    end
+  defp read_svg(path) do
+    path
+    |> File.read!()
+    |> String.trim()
   end
 
   defp get_config(key, default) do
