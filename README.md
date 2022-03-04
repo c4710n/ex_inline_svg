@@ -8,7 +8,7 @@
 
 ## Usage
 
-Visit [HexDocs](https://hexdocs.pm/phx_custom) for more details.
+Visit [InlineSVG](https://hexdocs.pm/inline_svg/InlineSVG.html) in [HexDocs](https://hexdocs.pm/inline_svg) for more details.
 
 ## License
 
