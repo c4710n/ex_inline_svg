@@ -1,7 +1,7 @@
 defmodule InlineSVG.MixProject do
   use Mix.Project
 
-  @version "0.1.2"
+  @version "0.1.3"
   @source_url "https://github.com/c4710n/ex_inline_svg"
   @description "An inline SVG renderer for everything."
 
