@@ -1,3 +1,8 @@
+> WARNING: use [`adept_svg`](https://github.com/adept-bits/adept_svg) which is
+>
+> - fastest
+> - zero deps
+
 # InlineSVG
 
 > An inline SVG renderer for everything.
@@ -16,9 +21,16 @@ Visit [InlineSVG](https://hexdocs.pm/inline_svg/InlineSVG.html) in [HexDocs](htt
 
 TLDR;
 
+```
+Comparison:
+adept_svg                8237.17
+inline_svg                172.58 - 47.73x slower +5.67 ms
+phoenix_inline_svg          1.92 - 4284.54x slower +520.03 ms
+```
+
 - The fastest is `adept_svg`.
 - The slowest is `phoenix_inline_svg`.
-- `inline_svg` is a joke. ;)
+- `inline_svg` is a joke, it is abandoned within a day of its completion. ;)
 
 ```
 Operating System: macOS
