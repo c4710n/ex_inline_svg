@@ -1,6 +1,10 @@
+defmodule SVGHelper do
+  use InlineSVG, root: Path.expand("test/svg_icons", __DIR__)
+end
+
 defmodule InlineSVGTest do
   use ExUnit.Case, async: true
-  use InlineSVG
+  import SVGHelper
 
   describe "svg(name, collection, opts)" do
     test "works with an HTML id" do

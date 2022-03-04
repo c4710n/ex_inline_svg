@@ -2,30 +2,28 @@ defmodule InlineSVG do
   @moduledoc """
   Render inline SVG.
 
-  > The core code is borrowed from [nikkomiu/phoenix_inline_svg](https://github.com/nikkomiu/phoenix_inline_svg).
 
-  ## Import Helpers for Phoenix
+  ## Initialization
 
-  Add the following to the quoted `view` in your `my_app_web.ex` file.
+  ```ex
+  def SVGHelper do
+    use InlineSVG, root: "assets/static/svg", default_collection: "generic"
+  end
+  ```
 
-      def view do
-        quote do
-          use InlineSVG
-        end
-      end
+  This will generate functions for each SVG file, effectively caching them at
+  compile time.
 
-  This will generate functions for each SVG file, effectively caching them at compile time.
 
   ## Usage
 
   ### render SVG from default collection
 
-  ```eex
-  <%= svg("home") %>
+  ```ex
+  svg("home")
   ```
 
-  It will load the SVG file from `assets/static/svg/generic/home.svg`, and inject
-  the content of SVG file to HTML:
+  It will load the SVG file from `assets/static/svg/generic/home.svg`:
 
   ```html
   <svg>...</svg>
@@ -36,12 +34,11 @@ defmodule InlineSVG do
   You can break up SVG files into collections, and use the second argument of
   `svg/2` to specify the name of collection:
 
-  ```eex
-  <%= svg_image("user", "fontawesome") %>
+  ```ex
+  svg("user", "fontawesome")
   ```
 
-  It will load the SVG file from `assets/static/svg/fontawesome/user.svg`, and
-  inject the content of SVG file to HTML:
+  It will load the SVG file from `assets/static/svg/fontawesome/user.svg`:
 
   ```html
   <svg>...</svg>
@@ -52,9 +49,9 @@ defmodule InlineSVG do
   You can also pass optional HTML attributes into the function to set those
   attributes on the SVG:
 
-  ```eex
-  <%= svg("home", class: "logo", id: "bounce-animation") %>
-  <%= svg("home", "fontawesome", class: "logo", id: "bounce-animation") %>
+  ```ex
+  svg("home", class: "logo", id: "bounce-animation")
+  svg("home", "fontawesome", class: "logo", id: "bounce-animation")
   ```
 
   It will output:
@@ -64,20 +61,16 @@ defmodule InlineSVG do
   <svg class="logo" id="bounce-animation">...</svg>
   ```
 
-  ## Configuration Options
+
+  ## Options
 
   There are several configuration options for meeting your needs.
 
-  ### `:dir`
+  ### `:root`
 
   Specify the directory from which to load SVG files.
 
-  The default value for standard way is `assets/static/svg/`.
-
-  ```elixir
-  config :inline_svg,
-    dir: "relative/path/to/the/root/of/project"
-  ```
+  You must specify it by your own.
 
   ### `:default_collection`
 
@@ -85,11 +78,28 @@ defmodule InlineSVG do
 
   The deafult value is `generic`.
 
-  ```elixir
-  config :inline_svg,
-    default_collection: "fontawesome"
-  ```
 
+  ## Use in Phoenix
+
+  An example:
+
+  ```ex
+  def DemoWeb.SVGHelper do
+    use InlineSVG, root: "assets/static/svg", default_collection: "generic"
+
+    def inline_svg(arg1) do
+      Phoenix.HTML.raw(svg(arg1))
+    end
+
+    def inline_svg(arg1, arg2) do
+      Phoenix.HTML.raw(svg(arg1, arg2))
+    end
+
+    def inline_svg(arg1, arg2, arg3) do
+      Phoenix.HTML.raw(svg(arg1, arg2, arg3))
+    end
+  end
+  ```
   """
 
   alias InlineSVG.HTML
@@ -97,13 +107,54 @@ defmodule InlineSVG do
   @doc """
   The macro precompiles the SVG files into functions.
   """
-  defmacro __using__(_) do
-    get_config(:dir, "assets/static/svg/")
-    |> scan_svgs()
-    |> Enum.map(&cache_svg/1)
+  defmacro __using__(opts \\ []) do
+    root = Keyword.fetch!(opts, :root)
+    {root, _} = Code.eval_quoted(root)
+
+    if !File.dir?(root) do
+      raise "invalid :root option"
+    end
+
+    default_collection = Keyword.get(opts, :default_collection, "generic")
+
+    [recompile_hooks(root) | generate_svg_fns(root, default_collection)]
   end
 
-  def scan_svgs(root) do
+  # Trigger recompile when SVG files change.
+  # Read more at https://hexdocs.pm/mix/1.13/Mix.Tasks.Compile.Elixir.html
+  defp recompile_hooks(root) do
+    quote bind_quoted: [root: root] do
+      @root root
+
+      paths =
+        @root
+        |> Path.join("**/*.svg")
+        |> Path.wildcard()
+        |> Enum.filter(&File.regular?(&1))
+
+      @paths_hash :erlang.md5(paths)
+
+      for path <- paths do
+        @external_resource path
+      end
+
+      def __mix_recompile__?() do
+        @root
+        |> Path.join("**/*.svg")
+        |> Path.wildcard()
+        |> Enum.filter(&File.regular?(&1))
+        |> :erlang.md5() != @paths_hash
+      end
+    end
+  end
+
+  defp generate_svg_fns(root, default_collection) do
+    root
+    |> scan_svgs()
+    |> Enum.flat_map(&cache_svg(&1, default_collection))
+  end
+
+  defp scan_svgs(root) do
     root
     |> Path.join("**/*.svg")
     |> Path.wildcard()
@@ -119,7 +170,7 @@ defmodule InlineSVG do
     end)
   end
 
-  defp cache_svg({collection, name, path}) do
+  defp cache_svg({collection, name, path}, default_collection) do
     content = read_svg(path)
 
     # parse HTML at compile time.
@@ -129,7 +180,7 @@ defmodule InlineSVG do
       |> Macro.escape()
 
     generic_functions =
-      if collection == get_config(:default_collection, "generic") do
+      if collection == default_collection do
         quote do
           def svg(unquote(name)) do
             svg(unquote(name), unquote(collection), [])
@@ -165,9 +216,5 @@ defmodule InlineSVG do
     path
     |> File.read!()
     |> String.trim()
-  end
-
-  defp get_config(key, default) do
-    Application.get_env(:inline_svg, key, default)
   end
 end
