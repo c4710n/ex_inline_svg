@@ -85,18 +85,21 @@ defmodule InlineSVG do
 
   ```ex
   def DemoWeb.SVGHelper do
-    use InlineSVG, root: "assets/static/svg", default_collection: "generic"
+    use InlineSVG,
+      root: "assets/static/svg",
+      default_collection: "generic",
+      function_prefix: "_"
 
-    def inline_svg(arg1) do
-      Phoenix.HTML.raw(svg(arg1))
+    def svg(arg1) do
+      Phoenix.HTML.raw(_svg(arg1))
     end
 
-    def inline_svg(arg1, arg2) do
-      Phoenix.HTML.raw(svg(arg1, arg2))
+    def svg(arg1, arg2) do
+      Phoenix.HTML.raw(_svg(arg1, arg2))
     end
 
-    def inline_svg(arg1, arg2, arg3) do
-      Phoenix.HTML.raw(svg(arg1, arg2, arg3))
+    def svg(arg1, arg2, arg3) do
+      Phoenix.HTML.raw(_svg(arg1, arg2, arg3))
     end
   end
   ```
@@ -115,9 +118,10 @@ defmodule InlineSVG do
       raise "invalid :root option"
     end
 
+    function_prefix = Keyword.get(opts, :function_prefix, "")
     default_collection = Keyword.get(opts, :default_collection, "generic")
 
-    [recompile_hooks(root) | generate_svg_fns(root, default_collection)]
+    [recompile_hooks(root) | generate_svg_fns(root, function_prefix, default_collection)]
   end
 
   # Trigger recompile when SVG files change.
@@ -148,10 +152,10 @@ defmodule InlineSVG do
     end
   end
 
-  defp generate_svg_fns(root, default_collection) do
+  defp generate_svg_fns(root, function_prefix, default_collection) do
     root
     |> scan_svgs()
-    |> Enum.flat_map(&cache_svg(&1, default_collection))
+    |> Enum.flat_map(&cache_svg(&1, function_prefix, default_collection))
   end
 
   defp scan_svgs(root) do
@@ -170,7 +174,7 @@ defmodule InlineSVG do
     end)
   end
 
-  defp cache_svg({collection, name, path}, default_collection) do
+  defp cache_svg({collection, name, path}, function_prefix, default_collection) do
     content = read_svg(path)
 
     # parse HTML at compile time.
@@ -182,27 +186,27 @@ defmodule InlineSVG do
     generic_functions =
       if collection == default_collection do
         quote do
-          def svg(unquote(name)) do
-            svg(unquote(name), unquote(collection), [])
+          def unquote(:"#{function_prefix}svg")(unquote(name)) do
+            unquote(:"#{function_prefix}svg")(unquote(name), unquote(collection), [])
           end
 
-          def svg(unquote(name), opts) when is_list(opts) do
-            svg(unquote(name), unquote(collection), opts)
+          def unquote(:"#{function_prefix}svg")(unquote(name), opts) when is_list(opts) do
+            unquote(:"#{function_prefix}svg")(unquote(name), unquote(collection), opts)
           end
         end
       end
 
     explicit_functions =
       quote do
-        def svg(unquote(name), unquote(collection)) do
-          svg(unquote(name), unquote(collection), [])
+        def unquote(:"#{function_prefix}svg")(unquote(name), unquote(collection)) do
+          unquote(:"#{function_prefix}svg")(unquote(name), unquote(collection), [])
         end
 
-        def svg(unquote(name), unquote(collection), []) do
+        def unquote(:"#{function_prefix}svg")(unquote(name), unquote(collection), []) do
           unquote(content)
         end
 
-        def svg(unquote(name), unquote(collection), opts) do
+        def unquote(:"#{function_prefix}svg")(unquote(name), unquote(collection), opts) do
           unquote(parsed_html)
           |> HTML.insert_attrs(opts)
           |> HTML.to_html()
