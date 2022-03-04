@@ -1,5 +1,7 @@
 # InlineSVG
 
+> An inline SVG renderer for everything.
+
 ## Features
 
 - file system sensitive re-compilation
