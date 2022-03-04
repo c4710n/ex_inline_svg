@@ -5,7 +5,7 @@ defmodule InlineSVG do
 
   ## Initialization
 
-  ```ex
+  ```elixir
   def SVGHelper do
     use InlineSVG, root: "assets/static/svg", default_collection: "generic"
   end
@@ -19,7 +19,7 @@ defmodule InlineSVG do
 
   ### render SVG from default collection
 
-  ```ex
+  ```elixir
   svg("home")
   ```
 
@@ -34,7 +34,7 @@ defmodule InlineSVG do
   You can break up SVG files into collections, and use the second argument of
   `svg/2` to specify the name of collection:
 
-  ```ex
+  ```elixir
   svg("user", "fontawesome")
   ```
 
@@ -49,7 +49,7 @@ defmodule InlineSVG do
   You can also pass optional HTML attributes into the function to set those
   attributes on the SVG:
 
-  ```ex
+  ```elixir
   svg("home", class: "logo", id: "bounce-animation")
   svg("home", "fontawesome", class: "logo", id: "bounce-animation")
   ```
@@ -72,6 +72,14 @@ defmodule InlineSVG do
 
   You must specify it by your own.
 
+  ### `:function_prefix`
+
+  Specify the prefix of functions.
+
+  By the default, the value is `""`. The generated function name is `svg`.
+
+  If this value is "_". Then generated function name is `_svg`.
+
   ### `:default_collection`
 
   Specify the default collection to use.
@@ -83,12 +91,13 @@ defmodule InlineSVG do
 
   An example:
 
-  ```ex
+  ```elixir
   def DemoWeb.SVGHelper do
     use InlineSVG,
       root: "assets/static/svg",
-      default_collection: "generic",
-      function_prefix: "_"
+      function_prefix: "_",
+      default_collection: "generic"
+
 
     def svg(arg1) do
       Phoenix.HTML.raw(_svg(arg1))
