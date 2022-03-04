@@ -21,7 +21,7 @@ defmodule InlineSVG.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:floki, "~> 0.26"}
+      {:floki, "~> 0.32"}
     ]
   end
 end
